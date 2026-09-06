@@ -26,5 +26,7 @@ export const XP = {
   resilience: 25,
   swim: 100,
   shop: 100,
+  gym: 75,
+  skill: 120,
   gate: 500,
 } as const;

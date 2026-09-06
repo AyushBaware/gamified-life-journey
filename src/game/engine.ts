@@ -12,12 +12,14 @@ export interface EngineAPI {
   sim: MutableRefObject<Sim>;
   action: () => void;
   restart: () => void;
+  loadChapter: (script: LevelScript) => void;
   togglePause: () => void;
   markReady: () => void;
 }
 
 export function useGameEngine(script: LevelScript, particles: MutableRefObject<ParticleAPI | null>): EngineAPI {
   const sim = useRef(createSimulation(script));
+  const scriptRef = useRef(script);
   const ready = useRef(false);
   const frameClock = useRef(0);
 
@@ -30,6 +32,7 @@ export function useGameEngine(script: LevelScript, particles: MutableRefObject<P
 
   const emit = useCallback((effect: SimulationEffect) => {
     const store = useStore.getState();
+    const theme = scriptRef.current.theme;
     switch (effect.type) {
       case "phase":
         store.setPhase(effect.phase);
@@ -40,6 +43,7 @@ export function useGameEngine(script: LevelScript, particles: MutableRefObject<P
       case "toast": store.pushToast(effect.toast, effect.toast.ttl); break;
       case "pop": store.pushPop(effect.text, effect.tone); break;
       case "badge": store.addBadge(effect.badge); syncStats(); break;
+      case "skill": store.addSkill(effect.skill); syncStats(); break;
       case "card": store.setCard(effect.card); break;
       case "caught": store.setCaught({ meters: effect.meters }); break;
       case "particles": {
@@ -47,26 +51,36 @@ export function useGameEngine(script: LevelScript, particles: MutableRefObject<P
         if (!p) break;
         const x = effect.x ?? 0;
         const y = effect.y ?? 1.5;
-        const colors = ["#FFB86B", "#FBBF24", "#FFFFFF", "#F59E0B"];
+        const colors = [theme.accent, theme.accent2, "#FFFFFF", "#FBBF24"];
         if (effect.kind === "dust") p.dust(x, effect.distance, effect.count);
         if (effect.kind === "splash") p.splash(x, y, effect.distance, effect.count);
-        if (effect.kind === "burst") p.burst(x, y, effect.distance, effect.color ?? "#FFB86B", effect.count);
+        if (effect.kind === "burst") p.burst(x, y, effect.distance, effect.color ?? theme.accent, effect.count);
         if (effect.kind === "confetti") p.confetti(x, y, effect.distance, colors, effect.count);
         break;
       }
     }
   }, [particles, syncStats]);
 
-  const restart = useCallback(() => {
-    sim.current = createSimulation(script, sim.current.revision + 1);
+  const boot = useCallback((nextScript: LevelScript, preserveBadges: boolean) => {
+    sim.current = createSimulation(nextScript, sim.current.revision + 1);
     particles.current?.clear();
     frameClock.current = 0;
     const store = useStore.getState();
-    store.resetRunUI();
+    if (preserveBadges) store.resetForChapter();
+    else store.resetRunUI();
     store.setReady(ready.current);
-    store.setTotalHurdles(script.events.filter((event) => event.kind === "hurdle").length);
+    store.setTotalHurdles(nextScript.events.filter((event) => event.kind === "hurdle").length);
     if (ready.current) sfx.play("start");
-  }, [script, particles]);
+  }, [particles]);
+
+  const restart = useCallback(() => {
+    boot(scriptRef.current, false);
+  }, [boot]);
+
+  const loadChapter = useCallback((nextScript: LevelScript) => {
+    scriptRef.current = nextScript;
+    boot(nextScript, true);
+  }, [boot]);
 
   const togglePause = useCallback(() => {
     if (!ready.current) return;
@@ -82,11 +96,10 @@ export function useGameEngine(script: LevelScript, particles: MutableRefObject<P
       restart();
       return;
     }
-    // Manual input takes over cinematic mode. Automatic input uses the simulation directly.
     if (store.autoplay) store.setAutoplay(false);
-    act(sim.current, script, emit);
+    act(sim.current, scriptRef.current, emit);
     syncStats();
-  }, [script, emit, restart, syncStats]);
+  }, [emit, restart, syncStats]);
 
   const markReady = useCallback(() => {
     if (ready.current) return;
@@ -104,7 +117,7 @@ export function useGameEngine(script: LevelScript, particles: MutableRefObject<P
       const dt = frameClock.current ? Math.min(0.05, (now - frameClock.current) / 1000) : 0;
       frameClock.current = now;
       if (ready.current && !document.hidden && !sim.current.paused) {
-        stepSimulation(sim.current, script, dt, useStore.getState().autoplay, emit);
+        stepSimulation(sim.current, scriptRef.current, dt, useStore.getState().autoplay, emit);
         if (sim.current.elapsed >= 2.6 && useStore.getState().chapterTitle) useStore.getState().setChapterTitle(false);
         if (now - lastStats >= 100) { syncStats(); lastStats = now; }
         if (sim.current.phase === "caught" && sim.current.phaseT >= 1.8 && useStore.getState().autoplay) restart();
@@ -124,7 +137,8 @@ export function useGameEngine(script: LevelScript, particles: MutableRefObject<P
       cancelAnimationFrame(raf);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [script, restart, emit, syncStats]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  return useMemo(() => ({ sim, action, restart, togglePause, markReady }), [action, restart, togglePause, markReady]);
+  return useMemo(() => ({ sim, action, restart, loadChapter, togglePause, markReady }), [action, restart, loadChapter, togglePause, markReady]);
 }

@@ -106,4 +106,3 @@ export function HeroStage({ mode = "idle", showTeacher = true }: { mode?: HeroMo
     </Canvas>
   );
 }
-

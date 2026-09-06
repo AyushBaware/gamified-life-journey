@@ -3,7 +3,7 @@ import {
   POOL_ENTRY_LEAD, POOL_EXIT_DISTANCE, POOL_EXIT_DURATION, PX,
   RUN_SPEED, SHOP_STOP_DISTANCE, SWIM_SPEED, TEACHER_GAP, WALK_SPEED, XP,
 } from "./constants";
-import type { Badge, HeroMode, LevelEvent, LevelScript, MilestoneCardData, Mood, ObjectStatus, Phase, TeacherMode, Toast } from "./types";
+import { SKILLS, type Badge, type HeroMode, type LevelEvent, type LevelScript, type MilestoneCardData, type Mood, type ObjectStatus, type Phase, type SkillId, type TeacherMode, type Toast } from "./types";
 import type { SfxName } from "../audio/sfx";
 
 export interface Sim {
@@ -25,6 +25,8 @@ export interface Sim {
   swimEventId: string | null;
   activeEventId: string | null;
   shopEventId: string | null;
+  gym: boolean;
+  skills: SkillId[];
   scriptedStage: number;
   clearedCount: number;
   score: number;
@@ -45,6 +47,7 @@ export type SimulationEffect =
   | { type: "badge"; badge: Badge }
   | { type: "card"; card: MilestoneCardData | null }
   | { type: "caught"; meters: number }
+  | { type: "skill"; skill: SkillId }
   | { type: "particles"; kind: "dust" | "splash" | "burst" | "confetti"; distance: number; y?: number; x?: number; color?: string; count?: number };
 
 export type EffectSink = (effect: SimulationEffect) => void;
@@ -59,7 +62,7 @@ export function createSimulation(script: LevelScript, revision = 0): Sim {
     teacherX: -TEACHER_GAP - 160, teacherMode: "chase", teacherGait: 0,
     shake: 0, statuses: new Map(script.events.map((event) => [event.id, "pending"])),
     awarded: new Set(), swimEventId: null, activeEventId: null, shopEventId: null,
-    scriptedStage: 0, clearedCount: 0, score: 0, xp: 0, elapsed: 0,
+    gym: false, skills: [], scriptedStage: 0, clearedCount: 0, score: 0, xp: 0, elapsed: 0,
     splashAt: 0, paused: false, caughtShown: false, jumpCount: 0, revision,
   };
 }
@@ -109,18 +112,26 @@ export function act(s: Sim, script: LevelScript, emit: EffectSink = noop) {
     s.heroMode = "happy";
     s.mood = "happy";
     s.shake = 0.4;
+    const major = gate.card.weight !== "soft";
     reward(s, { id: gate.id, kind: "boards", label: gate.card.title, detail: `${gate.card.stat} | ${gate.card.sub}`, xp: gate.card.xp }, emit);
     transition(s, "gateburst", emit);
-    emit({ type: "sound", name: "milestone" });
-    emit({ type: "particles", kind: "confetti", distance: gate.x, y: 4.6, count: 65 });
-    emit({ type: "particles", kind: "burst", distance: gate.x, y: 2.4, count: 32 });
+    emit({ type: "sound", name: major ? "milestone" : "soft" });
+    emit({ type: "particles", kind: "confetti", distance: gate.x, y: 4.6, count: major ? 65 : 18 });
+    emit({ type: "particles", kind: "burst", distance: gate.x, y: 2.4, count: major ? 32 : 10 });
   } else if (s.phase === "card") {
     if (s.activeEventId) s.statuses.set(s.activeEventId, "done");
     s.activeEventId = null;
-    s.heroMode = "walk";
-    s.teacherMode = "retreat";
     emit({ type: "card", card: null });
-    transition(s, "walk", emit);
+    const hasShop = script.events.some((event) => event.kind === "shop" && s.statuses.get(event.id) === "pending");
+    if (hasShop) {
+      s.heroMode = "walk";
+      s.teacherMode = "retreat";
+      transition(s, "walk", emit);
+    } else {
+      s.heroMode = "run";
+      s.mood = "happy";
+      transition(s, "running", emit);
+    }
   }
 }
 
@@ -141,7 +152,7 @@ function runningEvents(s: Sim, script: LevelScript, previous: number, previousY:
     if (s.statuses.get(event.id) !== "pending") continue;
     if (event.kind === "hurdle") {
       // Collision depth runs along the course, unlike width across the lane.
-      const depth = ({ books: 0.32, desk: 0.37, bar: 0.14, bench: 0.32, cone: 0.34, bag: 0.42 } as const)[event.variant] * PX + 6;
+      const depth = ({ books: 0.32, desk: 0.37, bar: 0.14, bench: 0.32, cone: 0.34, bag: 0.42, flask: 0.3 } as const)[event.variant] * PX + 6;
       const near = event.x - depth;
       const far = event.x + depth;
       if (previous <= far && s.distance >= near && Math.min(previousY, s.y) < event.h - 6) {
@@ -179,6 +190,21 @@ function runningEvents(s: Sim, script: LevelScript, previous: number, previousY:
         emit({ type: "sound", name: "jump" });
         return;
       }
+    } else if (event.kind === "skill") {
+      // Collected in stride — grab it as you pass, like a coin. No stop.
+      if (s.distance >= event.x - 26 && previous < event.x + 30) {
+        s.statuses.set(event.id, "collected");
+        if (!s.skills.includes(event.skill)) s.skills.push(event.skill);
+        const def = SKILLS[event.skill];
+        s.score += event.xp;
+        s.xp += event.xp;
+        s.mood = "happy";
+        emit({ type: "skill", skill: event.skill });
+        emit({ type: "sound", name: "collect" });
+        emit({ type: "pop", text: `+ ${def.label}`, tone: "success" });
+        emit({ type: "particles", kind: "burst", distance: event.x, y: 1.7, color: def.glow, count: 22 });
+        emit({ type: "toast", toast: { title: `Learned ${def.label}`, sub: def.learned, tone: "success", ttl: 2200, badgeKind: "skill", skill: event.skill } });
+      }
     } else if (event.kind === "slip" && s.distance >= event.x) {
       s.statuses.set(event.id, "active");
       s.activeEventId = event.id;
@@ -200,6 +226,27 @@ function runningEvents(s: Sim, script: LevelScript, previous: number, previousY:
       s.mood = "determined";
       s.teacherMode = "idle";
       transition(s, "gate", emit);
+      return;
+    } else if (event.kind === "powerup" && s.distance >= event.x) {
+      s.statuses.set(event.id, "active");
+      s.activeEventId = event.id;
+      ground(s);
+      s.gym = true;
+      s.heroMode = "happy";
+      s.mood = "happy";
+      reward(s, { id: event.id, kind: "gym", label: event.label, detail: event.detail, xp: event.xp }, emit);
+      emit({ type: "toast", toast: { title: "Joined Gym", sub: `${event.detail} · +${event.xp} XP`, tone: "accent", ttl: 3000, badgeKind: "gym" } });
+      emit({ type: "sound", name: "soft" });
+      emit({ type: "particles", kind: "burst", distance: s.distance, y: 1.9, color: "#4ade80", count: 16 });
+      transition(s, "powerup", emit);
+      return;
+    } else if (event.kind === "end" && s.distance >= event.x) {
+      s.statuses.set(event.id, "done");
+      s.heroMode = "happy";
+      s.mood = "happy";
+      transition(s, "complete", emit);
+      emit({ type: "sound", name: "complete" });
+      emit({ type: "particles", kind: "confetti", distance: event.x, y: 4.2, count: 55 });
       return;
     }
   }
@@ -300,14 +347,16 @@ export function stepSimulation(s: Sim, script: LevelScript, delta: number, autop
     case "scripted": {
       const event = script.events.find((item) => item.id === s.activeEventId);
       if (event?.kind !== "slip") break;
+      const officer = script.chaser === "officer";
       s.teacherX = damp(s.teacherX, s.distance - 30, 7, dt);
-      if (s.phaseT >= 0.45) s.teacherMode = "swing";
+      // Teacher: two comedic stick bonks. Officer: a stern whistle + pointed warning — no hitting.
+      if (s.phaseT >= 0.45) s.teacherMode = officer ? "point" : "swing";
       const beat = s.phaseT >= 1.15 ? 2 : s.phaseT >= 0.75 ? 1 : 0;
       if (beat > s.scriptedStage) {
         s.scriptedStage = beat;
-        s.shake = 0.35;
-        emit({ type: "sound", name: "bonk" });
-        emit({ type: "particles", kind: "burst", distance: s.distance, y: 2, color: "#FFD24A", count: 8 });
+        s.shake = officer ? 0.15 : 0.35;
+        emit({ type: "sound", name: officer ? "whistle" : "bonk" });
+        emit({ type: "particles", kind: "burst", distance: s.distance, y: 2, color: officer ? "#FCA5A5" : "#FFD24A", count: 8 });
       }
       if (s.phaseT >= 1.7) {
         s.statuses.set(event.id, "done");
@@ -322,6 +371,14 @@ export function stepSimulation(s: Sim, script: LevelScript, delta: number, autop
       }
       break;
     }
+    case "powerup":
+      if (s.phaseT >= 1.5) {
+        s.heroMode = "run";
+        s.mood = "neutral";
+        s.activeEventId = null;
+        transition(s, "running", emit);
+      }
+      break;
     case "gate":
       if (autoplay && s.phaseT >= 1.1) act(s, script, emit);
       break;
@@ -377,7 +434,7 @@ export function stepSimulation(s: Sim, script: LevelScript, delta: number, autop
   } else if ((s.phase === "swim" || s.phase === "dive" || s.phase === "exit") && pool?.kind === "swim") {
     s.teacherX = damp(s.teacherX, pool.start - 46, 4, dt);
     s.teacherMode = "point";
-  } else if (["gate", "gateburst", "card", "shopvisit", "complete"].includes(s.phase)) {
+  } else if (["gate", "gateburst", "card", "powerup", "shopvisit", "complete"].includes(s.phase)) {
     s.teacherX = damp(s.teacherX, s.distance - 96, 2.4, dt);
     s.teacherMode = "idle";
   }

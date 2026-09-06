@@ -62,7 +62,7 @@ function Desk({ w }: { w: number }) {
   );
 }
 
-function HurdleBar({ w, h }: { w: number; h: number }) {
+function HurdleBar({ w, h, accent }: { w: number; h: number; accent: string }) {
   return (
     <group>
       {[-w / 2 + 0.06, w / 2 - 0.06].map((lx, i) => (
@@ -79,12 +79,45 @@ function HurdleBar({ w, h }: { w: number; h: number }) {
       ))}
       <mesh position={[0, h - 0.05, 0]} castShadow>
         <boxGeometry args={[w + 0.06, 0.13, 0.09]} />
-        <meshStandardMaterial color="#FFB86B" emissive="#FFB86B" emissiveIntensity={1.1} toneMapped={false} />
+        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={1.1} toneMapped={false} />
       </mesh>
       <mesh position={[0, h - 0.28, 0]}>
         <boxGeometry args={[w + 0.06, 0.05, 0.05]} />
         <meshStandardMaterial color="#F8FAFC" roughness={0.6} />
       </mesh>
+    </group>
+  );
+}
+
+function Flask({ accent }: { accent: string }) {
+  return (
+    <group>
+      <mesh position={[0, 0.05, 0]} castShadow>
+        <boxGeometry args={[0.42, 0.06, 0.3]} />
+        <meshStandardMaterial color="#8B95A5" metalness={0.4} roughness={0.5} />
+      </mesh>
+      <mesh position={[0, 0.28, 0]} castShadow>
+        <cylinderGeometry args={[0.04, 0.04, 0.42, 10]} />
+        <meshStandardMaterial color="#9AA4B4" metalness={0.6} roughness={0.4} />
+      </mesh>
+      <mesh position={[0, 0.52, 0]} castShadow>
+        <coneGeometry args={[0.24, 0.4, 16]} />
+        <meshStandardMaterial color="#E4F4F6" roughness={0.15} metalness={0.05} transparent opacity={0.82} />
+      </mesh>
+      <mesh position={[0, 0.44, 0]}>
+        <coneGeometry args={[0.16, 0.24, 16]} />
+        <meshStandardMaterial color={accent} roughness={0.3} emissive={accent} emissiveIntensity={0.35} />
+      </mesh>
+      <mesh position={[0, 0.78, 0]}>
+        <cylinderGeometry args={[0.055, 0.1, 0.16, 12]} />
+        <meshStandardMaterial color="#E4F4F6" roughness={0.15} metalness={0.05} transparent opacity={0.82} />
+      </mesh>
+      {[0.1, -0.04, 0.04].map((x, i) => (
+        <mesh key={i} position={[x, 0.5 + i * 0.05, 0]}>
+          <sphereGeometry args={[0.024, 8, 8]} />
+          <meshStandardMaterial color="#C7F5E4" roughness={0.3} />
+        </mesh>
+      ))}
     </group>
   );
 }
@@ -167,9 +200,10 @@ function SchoolBag({ w }: { w: number }) {
 interface Props {
   ev: Extract<LevelEvent, { kind: "hurdle" }>;
   status: ObjectStatus;
+  accent: string;
 }
 
-export function Obstacle({ ev, status }: Props) {
+export function Obstacle({ ev, status, accent }: Props) {
   const ref = useRef<THREE.Group>(null);
   const hit = status === "hit";
   const cleared = status === "cleared";
@@ -181,7 +215,7 @@ export function Obstacle({ ev, status }: Props) {
   });
   const w = ev.w / PX;
   const h = ev.h / PX;
-  const nativeHeight = { books: 0.97, desk: 0.72, bar: h, bench: 0.73, cone: 0.55, bag: 0.75 }[ev.variant];
+  const nativeHeight = { books: 0.97, desk: 0.72, bar: h, bench: 0.73, cone: 0.55, bag: 0.75, flask: 1.0 }[ev.variant] ?? h;
   const tint = cleared ? "#4ade80" : undefined;
 
   return (
@@ -190,10 +224,11 @@ export function Obstacle({ ev, status }: Props) {
         <group scale={[1, h / nativeHeight, 1]}>
         {ev.variant === "books" && <Books w={w} />}
         {ev.variant === "desk" && <Desk w={w} />}
-        {ev.variant === "bar" && <HurdleBar w={w} h={h} />}
+        {ev.variant === "bar" && <HurdleBar w={w} h={h} accent={accent} />}
         {ev.variant === "bench" && <BenchObstacle w={w} />}
         {ev.variant === "cone" && <Cones w={w} />}
         {ev.variant === "bag" && <SchoolBag w={w} />}
+        {ev.variant === "flask" && <Flask accent={accent} />}
         </group>
         {cleared && (
           <mesh position={[0, h + 0.35, 0]}>

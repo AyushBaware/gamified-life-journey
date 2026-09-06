@@ -4,6 +4,12 @@ import { sfx } from "../audio/sfx";
 
 /* ---------- chapter title banner ---------- */
 
+const CHAPTER_SUBTITLES: Record<string, string> = {
+  "01": "the teacher is already chasing…",
+  "02": "seventeen, on his Activa — a traffic officer is on duty",
+  "03": "three years of B.Sc IT — collect every skill on the way",
+};
+
 export function ChapterTitle({ name, chapterNo }: { name: string; chapterNo: string }) {
   const visible = useStore((s) => s.chapterTitle);
   return (
@@ -24,7 +30,7 @@ export function ChapterTitle({ name, chapterNo }: { name: string; chapterNo: str
           <h2 className="font-display mt-2 text-4xl font-bold leading-tight text-white sm:text-6xl" style={{ textShadow: "0 0 26px color-mix(in srgb, var(--accent) 55%, transparent)" }}>
             {name}
           </h2>
-          <p className="mt-2 text-sm italic text-slate-300 sm:text-base">— the teacher is already chasing…</p>
+          <p className="mt-2 text-sm italic text-slate-300 sm:text-base">— {CHAPTER_SUBTITLES[chapterNo] ?? "the teacher is already chasing…"}</p>
         </motion.div>
       )}
     </AnimatePresence>
@@ -36,6 +42,7 @@ export function ChapterTitle({ name, chapterNo }: { name: string; chapterNo: str
 export function MilestoneCard({ onContinue }: { onContinue: () => void }) {
   const card = useStore((s) => s.card);
   const isTouch = useStore((s) => s.isTouch);
+  const major = card?.weight !== "soft";
   return (
     <AnimatePresence>
       {card && (
@@ -66,42 +73,46 @@ export function MilestoneCard({ onContinue }: { onContinue: () => void }) {
               boxShadow: "0 30px 80px rgba(0,0,0,0.55), 0 0 60px color-mix(in srgb, var(--accent) 22%, transparent)",
             }}
           >
-            {/* rotating rays */}
-            <div
-              className="pointer-events-none absolute -top-24 left-1/2 h-72 w-72 -translate-x-1/2 opacity-25"
-              style={{
-                background: "conic-gradient(from 0deg, transparent 0 14deg, var(--accent) 14deg 18deg, transparent 18deg 32deg, var(--accent) 32deg 36deg, transparent 36deg 50deg, var(--accent) 50deg 54deg, transparent 54deg 68deg, var(--accent) 68deg 72deg, transparent 72deg 360deg)",
-                animation: "spin 14s linear infinite",
-              }}
-            />
-            <style>{`@keyframes spin { to { transform: translateX(-50%) rotate(360deg); } }`}</style>
+            {major && (
+              <>
+                <div
+                  className="pointer-events-none absolute -top-24 left-1/2 h-72 w-72 -translate-x-1/2 opacity-25"
+                  style={{
+                    background: "conic-gradient(from 0deg, transparent 0 14deg, var(--accent) 14deg 18deg, transparent 18deg 32deg, var(--accent) 32deg 36deg, transparent 36deg 50deg, var(--accent) 50deg 54deg, transparent 54deg 68deg, var(--accent) 68deg 72deg, transparent 72deg 360deg)",
+                    animation: "spin 14s linear infinite",
+                  }}
+                />
+                <style>{`@keyframes spin { to { transform: translateX(-50%) rotate(360deg); } }`}</style>
+              </>
+            )}
 
             <div className="relative text-[10px] font-bold uppercase tracking-[0.34em]" style={{ color: "var(--accent)" }}>
               {card.eyebrow}
             </div>
 
-            {/* trophy mark */}
-            <div className="relative mx-auto mt-3 flex h-16 w-16 items-center justify-center rounded-2xl" style={{ background: "color-mix(in srgb, var(--accent) 14%, transparent)", border: "1px solid color-mix(in srgb, var(--accent) 40%, transparent)" }}>
-              <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
-                <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
-                <path d="M4 22h16" />
-                <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
-                <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
-                <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
-              </svg>
-            </div>
+            {major && (
+              <div className="relative mx-auto mt-3 flex h-16 w-16 items-center justify-center rounded-2xl" style={{ background: "color-mix(in srgb, var(--accent) 14%, transparent)", border: "1px solid color-mix(in srgb, var(--accent) 40%, transparent)" }}>
+                <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
+                  <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
+                  <path d="M4 22h16" />
+                  <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
+                  <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
+                  <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
+                </svg>
+              </div>
+            )}
 
             <h3 className="font-display relative mt-3 text-2xl font-bold text-white sm:text-3xl">{card.title}</h3>
             <div
-              className="font-display relative mt-1 text-6xl font-bold sm:text-7xl"
-              style={{
+              className={major ? "font-display relative mt-1 text-6xl font-bold sm:text-7xl" : "font-display relative mt-2 text-3xl font-bold text-slate-200"}
+              style={major ? {
                 background: "linear-gradient(120deg, #ffffff 0%, var(--accent) 55%, var(--accent-2) 100%)",
                 WebkitBackgroundClip: "text",
                 backgroundClip: "text",
                 color: "transparent",
                 textShadow: "0 0 44px color-mix(in srgb, var(--accent) 35%, transparent)",
-              }}
+              } : undefined}
             >
               {card.stat}
             </div>
@@ -190,7 +201,7 @@ export function CaughtOverlay({ onRestart }: { onRestart: () => void }) {
 
 /* ---------- chapter complete ---------- */
 
-export function CompleteCard({ onReplay, onPresent, xp, cleared, totalHurdles }: { onReplay: () => void; onPresent: () => void; xp: number; cleared: number; totalHurdles: number }) {
+export function CompleteCard({ onReplay, onPresent, onNext, nextLabel, chapterNo, chapterName, xp, cleared, totalHurdles, memories }: { onReplay: () => void; onPresent: () => void; onNext?: () => void; nextLabel?: string; chapterNo: string; chapterName: string; xp: number; cleared: number; totalHurdles: number; memories: number }) {
   const phase = useStore((s) => s.phase);
   return (
     <AnimatePresence>
@@ -215,16 +226,16 @@ export function CompleteCard({ onReplay, onPresent, xp, cleared, totalHurdles }:
             }}
           >
             <div className="text-[10px] font-bold uppercase tracking-[0.34em]" style={{ color: "var(--accent)" }}>
-              Chapter 01 cleared
+              Chapter {chapterNo} cleared
             </div>
-            <h3 className="font-display mt-2 text-3xl font-bold text-white sm:text-4xl">School Days — done! 🎓</h3>
-            <p className="mt-2 text-sm text-slate-400">10th Boards cleared, swimming practice, and a visit to Father&apos;s shop.</p>
+            <h3 className="font-display mt-2 text-3xl font-bold text-white sm:text-4xl">{chapterName} — done! 🎓</h3>
+            <p className="mt-2 text-sm text-slate-400">Every hurdle cleared, every memory collected.</p>
 
             <div className="mt-5 grid grid-cols-3 gap-2">
               {[
                 { v: xp.toLocaleString(), l: "XP" },
                 { v: `${cleared}/${totalHurdles}`, l: "Hurdles" },
-                { v: "89.40%", l: "10th Boards" },
+                { v: String(memories), l: "Memories" },
               ].map((s, i) => (
                 <div key={i} className="rounded-2xl border border-white/10 bg-white/5 px-2 py-3">
                   <div className="font-display text-xl font-bold text-white">{s.v}</div>
@@ -247,13 +258,13 @@ export function CompleteCard({ onReplay, onPresent, xp, cleared, totalHurdles }:
               <button
                 type="button"
                 onClick={() => {
-                  sfx.play("ui");
-                  onPresent();
+                  if (onNext) { sfx.play("start"); onNext(); }
+                  else { sfx.play("ui"); onPresent(); }
                 }}
                 className="flex-1 rounded-2xl py-3 text-xs font-bold uppercase tracking-[0.18em] text-ink transition hover:brightness-110"
                 style={{ background: "linear-gradient(90deg, var(--accent), #ffffff)" }}
               >
-                Present Day ➜
+                {onNext ? nextLabel : "Present Day"} ➜
               </button>
             </div>
           </motion.div>

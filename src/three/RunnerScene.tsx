@@ -1,17 +1,22 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from "react";
 import * as THREE from "three";
-import type { LevelScript } from "../game/types";
+import type { LevelScript, SkillId } from "../game/types";
 import type { Sim } from "../game/engine";
 import { POOL_EXIT_DURATION, PX, RUNNER_YAW } from "../game/constants";
 import { Hero } from "./characters/Hero";
 import { Teacher } from "./characters/Teacher";
+import { Officer } from "./characters/Officer";
 import { Backdrop } from "./world/Backdrop";
 import { Track } from "./world/Track";
 import { Obstacle } from "./world/Obstacles";
 import { Gate } from "./world/Gate";
 import { Pool } from "./world/Pool";
 import { Shop } from "./world/Shop";
+import { Scooty } from "./world/Scooty";
+import { Students } from "./world/Students";
+import { SkillOrb } from "./world/SkillOrb";
+import { Roadside } from "./world/Roadside";
 import { Particles, type ParticleAPI } from "./Particles";
 import { makeBlobTexture } from "./textures";
 
@@ -103,7 +108,7 @@ function WorldScroller({ sim, children }: { sim: MutableRefObject<Sim>; children
 }
 
 /** Hero + teacher wrappers reading the sim each frame */
-function HeroRig({ sim, reduced }: { sim: MutableRefObject<Sim>; reduced: boolean }) {
+function HeroRig({ sim, reduced, script }: { sim: MutableRefObject<Sim>; reduced: boolean; script: LevelScript }) {
   const g = useRef<THREE.Group>(null);
   useFrame((_state, dt) => {
     if (!g.current) return;
@@ -118,7 +123,8 @@ function HeroRig({ sim, reduced }: { sim: MutableRefObject<Sim>; reduced: boolea
   });
   return (
     <group ref={g} rotation={[0, RUNNER_YAW, 0]}>
-      <Hero stateRef={sim} reduced={reduced} />
+      {script.vehicle === "scooty" && <Scooty sim={sim} accent={script.theme.accent} />}
+      <Hero stateRef={sim} reduced={reduced} outfit={script.outfit} riding={script.vehicle === "scooty"} accent={script.theme.accent} />
     </group>
   );
 }
@@ -136,7 +142,7 @@ function TeacherRig({ sim, script }: { sim: MutableRefObject<Sim>; script: Level
   });
   return (
     <group ref={g} rotation={[0, RUNNER_YAW, 0]} position={[-0.9, 0, 5]}>
-      <Teacher stateRef={sim} />
+      {script.chaser === "officer" ? <Officer stateRef={sim} /> : <Teacher stateRef={sim} />}
     </group>
   );
 }
@@ -161,6 +167,8 @@ export function RunnerScene({ script, sim, particles, reduced, onReady }: Props)
   const gate = script.events.find((e) => e.kind === "gate");
   const shop = script.events.find((e) => e.kind === "shop");
   const hurdles = script.events.filter((e) => e.kind === "hurdle");
+  const skills = script.events.filter((e) => e.kind === "skill");
+  const roadVariant = script.outfit === "school" ? "school" : script.outfit === "twelfth" ? "twelfth" : "college";
 
   return (
     <div className="absolute inset-0" style={{ zIndex: 0 }}>
@@ -171,17 +179,16 @@ export function RunnerScene({ script, sim, particles, reduced, onReady }: Props)
         gl={{ antialias: true, powerPreference: "high-performance" }}
         onCreated={({ gl, scene }) => {
           gl.toneMappingExposure = 1.02;
-          scene.background = new THREE.Color("#C1B5A5");
-          scene.fog = new THREE.Fog(new THREE.Color("#C1B5A5"), 35, 115);
+          scene.background = new THREE.Color(script.theme.fog);
+          scene.fog = new THREE.Fog(new THREE.Color(script.theme.fog), 35, 115);
         }}
       >
-        {/* golden hour light */}
-        <ambientLight intensity={0.5} color="#FFE9CF" />
-        <hemisphereLight args={["#BCD2DF", "#48553B", 0.7]} />
+        <ambientLight intensity={0.5} color={script.theme.horizon} />
+        <hemisphereLight args={[script.theme.skyMid, "#48553B", 0.7]} />
         <directionalLight
           position={[7, 11, -9]}
           intensity={1.7}
-          color="#FFE0B3"
+          color={script.theme.horizon}
           castShadow
           shadow-mapSize={[1024, 1024]}
           shadow-camera-left={-9}
@@ -193,23 +200,28 @@ export function RunnerScene({ script, sim, particles, reduced, onReady }: Props)
           shadow-normalBias={0.035}
           shadow-bias={-0.00015}
         />
-        <directionalLight position={[-8, 5, 6]} intensity={0.45} color="#BFD5E7" />
+        <directionalLight position={[-8, 5, 6]} intensity={0.45} color={script.theme.accent} />
 
         <CameraRig sim={sim} reduced={reduced} />
-        <Backdrop reduced={reduced} />
+        <Backdrop theme={script.theme} reduced={reduced} />
 
         <WorldScroller sim={sim}>
-          <Track length={script.length} pool={swim?.kind === "swim" ? swim : undefined} reduced={reduced} />
+          <Track length={script.length} pool={swim?.kind === "swim" ? swim : undefined} reduced={reduced} variant={roadVariant} accent={script.theme.accent} />
+          <Roadside variant={roadVariant} accent={script.theme.accent} />
+          {skills.map((ev) =>
+            ev.kind === "skill" ? <SkillOrbWithStatus key={ev.id} sim={sim} id={ev.id} x={ev.x} skill={ev.skill} /> : null,
+          )}
           {hurdles.map((ev) =>
-            ev.kind === "hurdle" ? <ObstacleWithStatus key={ev.id} sim={sim} ev={ev} /> : null,
+            ev.kind === "hurdle" ? <ObstacleWithStatus key={ev.id} sim={sim} ev={ev} accent={script.theme.accent} /> : null,
           )}
           {swim && swim.kind === "swim" && <Pool start={swim.start} end={swim.end} />}
-          {gate && gate.kind === "gate" && <GateWithStatus sim={sim} x={gate.x} label={gate.label} id={gate.id} />}
+          {gate && gate.kind === "gate" && <GateWithStatus sim={sim} x={gate.x} label={gate.label} id={gate.id} accent={script.theme.accent} />}
           {shop && shop.kind === "shop" && <ShopWithStatus sim={sim} x={shop.x} id={shop.id} />}
+          {script.students && <Students reduced={reduced} />}
           <Particles apiRef={particles} reduced={reduced} />
         </WorldScroller>
 
-        <HeroRig sim={sim} reduced={reduced} />
+        <HeroRig sim={sim} reduced={reduced} script={script} />
         <HeroShadowBlob sim={sim} />
         <TeacherRig sim={sim} script={script} />
         <SceneReady onReady={onReady} />
@@ -219,15 +231,19 @@ export function RunnerScene({ script, sim, particles, reduced, onReady }: Props)
 }
 
 /* thin status bridges — read the sim each frame so meshes react live */
-function ObstacleWithStatus({ sim, ev }: { sim: MutableRefObject<Sim>; ev: Extract<LevelScript["events"][number], { kind: "hurdle" }> }) {
+function ObstacleWithStatus({ sim, ev, accent }: { sim: MutableRefObject<Sim>; ev: Extract<LevelScript["events"][number], { kind: "hurdle" }>; accent: string }) {
   const status = useSimValue(() => sim.current.statuses.get(ev.id) ?? "pending");
-  return <Obstacle ev={ev} status={status} />;
+  return <Obstacle ev={ev} status={status} accent={accent} />;
 }
-function GateWithStatus({ sim, x, label, id }: { sim: MutableRefObject<Sim>; x: number; label: string; id: string }) {
+function GateWithStatus({ sim, x, label, id, accent }: { sim: MutableRefObject<Sim>; x: number; label: string; id: string; accent: string }) {
   const status = useSimValue(() => sim.current.statuses.get(id) ?? "pending");
-  return <Gate x={x} label={label} status={status} />;
+  return <Gate x={x} label={label} status={status} accent={accent} />;
 }
 function ShopWithStatus({ sim, x, id }: { sim: MutableRefObject<Sim>; x: number; id: string }) {
   const active = useSimValue(() => sim.current.awarded.has(id));
   return <Shop x={x} active={active} />;
+}
+function SkillOrbWithStatus({ sim, id, x, skill }: { sim: MutableRefObject<Sim>; id: string; x: number; skill: SkillId }) {
+  const status = useSimValue(() => sim.current.statuses.get(id) ?? "pending");
+  return <SkillOrb x={x} skill={skill} status={status} />;
 }

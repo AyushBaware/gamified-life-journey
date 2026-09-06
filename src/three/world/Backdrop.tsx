@@ -3,13 +3,18 @@ import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { makeBlobTexture, makeCloudTexture, makeSkylineTexture } from "../textures";
 import { DriftingLeaves } from "./Foliage";
+import type { ChapterTheme } from "../../game/types";
 
-/**
- * Golden-hour sky: gradient dome, low sun with halos, drifting low-poly
- * clouds and two parallax skyline strips. No assets — all canvas + shaders.
- */
+const DEFAULT_THEME: ChapterTheme = {
+  accent: "#FFB86B",
+  accent2: "#F59E0B",
+  skyTop: "#426581",
+  skyMid: "#B0AAA6",
+  horizon: "#EFC69A",
+  fog: "#C1B5A5",
+};
 
-function SkyDome() {
+function SkyDome({ top, mid, horizon }: { top: string; mid: string; horizon: string }) {
   return (
     <mesh>
       <sphereGeometry args={[160, 32, 16]} />
@@ -17,9 +22,9 @@ function SkyDome() {
         side={THREE.BackSide}
         depthWrite={false}
         uniforms={{
-          uTop: { value: new THREE.Color("#426581") },
-          uMid: { value: new THREE.Color("#B0AAA6") },
-          uHorizon: { value: new THREE.Color("#EFC69A") },
+          uTop: { value: new THREE.Color(top) },
+          uMid: { value: new THREE.Color(mid) },
+          uHorizon: { value: new THREE.Color(horizon) },
         }}
         vertexShader={`
           varying vec3 vPos;
@@ -65,6 +70,7 @@ function Cloud({ position, scale = 1, speed, reduced }: { position: [number, num
 
 function SkylineStrip({ z, tint, windowColor, opacity, height }: { z: number; tint: string; windowColor: string; opacity: number; height: number }) {
   const tex = useMemo(() => makeSkylineTexture(tint, windowColor), [tint, windowColor]);
+  useEffect(() => () => tex.dispose(), [tex]);
   return (
     <mesh position={[0, height / 2 - 1, z]}>
       <planeGeometry args={[260, height]} />
@@ -73,32 +79,33 @@ function SkylineStrip({ z, tint, windowColor, opacity, height }: { z: number; ti
   );
 }
 
-export function Backdrop({ reduced = false }: { reduced?: boolean }) {
+export function Backdrop({ theme = DEFAULT_THEME, reduced = false }: { theme?: ChapterTheme; reduced?: boolean }) {
   const halo = useMemo(() => makeBlobTexture("255,204,137"), []);
   useEffect(() => () => halo.dispose(), [halo]);
   return (
     <group>
-      <SkyDome />
-      {/* low golden sun */}
+      <SkyDome top={theme.skyTop} mid={theme.skyMid} horizon={theme.horizon} />
+      {/* low sun / moon disc */}
       <mesh position={[26, 9, -110]}>
         <circleGeometry args={[3.6, 40]} />
-        <meshBasicMaterial color="#FFD28A" toneMapped={false} fog={false} />
+        <meshBasicMaterial color={theme.horizon} toneMapped={false} fog={false} />
       </mesh>
       <sprite position={[26, 9, -109.8]} scale={[37, 37, 1]}>
         <spriteMaterial map={halo} transparent opacity={0.5} blending={THREE.AdditiveBlending} depthWrite={false} fog={false} />
       </sprite>
-      <Hills z={-137} height={14} color="#9CAAA7" />
-      <Hills z={-117} height={8} color="#80988C" />
+      {/* rolling hills follow the chapter palette */}
+      <Hills z={-137} height={14} color={theme.skyTop} />
+      <Hills z={-117} height={8} color={theme.skyMid} />
       {/* parallax skylines */}
-      <SkylineStrip z={-104} tint="#566861" windowColor="#EFCFA4" opacity={0.55} height={13} />
-      <SkylineStrip z={-88} tint="#4B615A" windowColor="#EFCFA4" opacity={0.6} height={9} />
+      <SkylineStrip z={-104} tint={theme.skyTop} windowColor={theme.accent2} opacity={0.5} height={13} />
+      <SkylineStrip z={-88} tint={theme.skyMid} windowColor={theme.accent} opacity={0.55} height={9} />
       {/* clouds */}
       <Cloud position={[-18, 16, -70]} scale={2.4} speed={0.5} reduced={reduced} />
       <Cloud position={[14, 20, -95]} scale={3.1} speed={0.35} reduced={reduced} />
       <Cloud position={[34, 13, -55]} scale={1.9} speed={0.6} reduced={reduced} />
       <Cloud position={[-36, 22, -110]} scale={3.6} speed={0.28} reduced={reduced} />
       <Cloud position={[2, 25, -120]} scale={2.8} speed={0.22} reduced={reduced} />
-      {/* birds — tiny chevrons */}
+      {/* birds */}
       {[0, 1, 2].map((i) => (
         <Birds key={i} offset={i * 2.4} y={10 + i * 2.5} z={-55 - i * 14} reduced={reduced} />
       ))}

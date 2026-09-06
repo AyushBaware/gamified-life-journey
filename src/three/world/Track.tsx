@@ -126,7 +126,7 @@ function Bench({ x, z }: { x: number; z: number }) {
   );
 }
 
-function RoadSection({ start, end, texture }: { start: number; end: number; texture: THREE.Texture }) {
+function RoadSection({ start, end, texture, accent }: { start: number; end: number; texture: THREE.Texture; accent: string }) {
   const map = useMemo(() => {
     const clone = texture.clone();
     clone.repeat.set(2.4, (end - start) / 3);
@@ -149,8 +149,155 @@ function RoadSection({ start, end, texture }: { start: number; end: number; text
       ))}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.009, middle]}>
         <planeGeometry args={[0.065, end - start]} />
-        <meshBasicMaterial color="#E4C58F" transparent opacity={0.3} depthWrite={false} />
+        <meshBasicMaterial color={accent} transparent opacity={0.28} depthWrite={false} />
       </mesh>
+    </group>
+  );
+}
+
+function CollegeCampus({ accent }: { accent: string }) {
+  const sign = useMemo(
+    () => makeLabelTexture("SHRI MATHURADAS MOHOTA COLLEGE OF SCIENCE", { font: "700 30px 'Fredoka', sans-serif", bg: "#1F3A3E", color: "#E7F0EE", border: accent, radius: 3 }),
+    [accent],
+  );
+  useEffect(() => () => sign.tex.dispose(), [sign]);
+  return (
+    <group position={[-18, 0, -52]} rotation={[0, 0.12, 0]}>
+      {/* lawn */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.03, 8]} receiveShadow>
+        <planeGeometry args={[30, 22]} />
+        <meshStandardMaterial color="#4D6E3A" roughness={1} />
+      </mesh>
+
+      {/* ---------- MAIN BLOCK ---------- */}
+      <mesh position={[0, 4.6, -1.5]} castShadow>
+        <boxGeometry args={[21, 9.2, 6.5]} />
+        <meshStandardMaterial color="#9FB6B2" roughness={0.9} />
+      </mesh>
+      {/* roof ledge */}
+      <mesh position={[0, 9.35, -1.5]}>
+        <boxGeometry args={[22, 0.5, 7.1]} />
+        <meshStandardMaterial color="#7B938F" roughness={0.85} />
+      </mesh>
+
+      {/* ---------- CENTRAL TOWER ---------- */}
+      <mesh position={[0, 12.9, -1.8]} castShadow>
+        <boxGeometry args={[6, 6.6, 5.2]} />
+        <meshStandardMaterial color="#8CA5A1" roughness={0.9} />
+      </mesh>
+      <mesh position={[0, 16.9, -1.8]} rotation={[0, Math.PI / 4, 0]} scale={[2.45, 1, 2.45]} castShadow>
+        <coneGeometry args={[3.6, 1.7, 4]} />
+        <meshStandardMaterial color="#5F7A76" roughness={0.9} />
+      </mesh>
+      {/* clock on the tower */}
+      <group position={[0, 12.6, 1.0]}>
+        <mesh>
+          <cylinderGeometry args={[0.85, 0.85, 0.14, 22]} />
+          <meshStandardMaterial color="#F2ECDE" roughness={0.6} />
+        </mesh>
+        <mesh position={[0, 0, 0.08]}>
+          <cylinderGeometry args={[0.72, 0.72, 0.03, 22]} />
+          <meshStandardMaterial color="#1F3A3E" roughness={0.6} />
+        </mesh>
+        <mesh position={[0, 0.22, 0.11]}>
+          <boxGeometry args={[0.05, 0.45, 0.03]} />
+          <meshStandardMaterial color="#F2ECDE" />
+        </mesh>
+        <mesh position={[0.16, 0.05, 0.11]} rotation={[0, 0, -1.2]}>
+          <boxGeometry args={[0.04, 0.34, 0.03]} />
+          <meshStandardMaterial color="#F2ECDE" />
+        </mesh>
+      </group>
+      {/* tower windows */}
+      {[1.8, 3.6].flatMap((y, r) => [-1.9, 0, 1.9].map((x, c) => (
+        <mesh key={`${r}-${c}`} position={[x, y, 1.2]}>
+          <planeGeometry args={[1.15, 1.6]} />
+          <meshStandardMaterial color={c === 1 ? accent : "#D6E4E2"} emissive={c === 1 ? accent : "#000000"} emissiveIntensity={c === 1 ? 0.4 : 0} roughness={0.3} />
+        </mesh>
+      )))}
+      {/* flag on top */}
+      <mesh position={[1.6, 18.6, -1.8]}>
+        <cylinderGeometry args={[0.04, 0.04, 3, 6]} />
+        <meshStandardMaterial color="#2A3A38" />
+      </mesh>
+      <mesh position={[2.15, 19.9, -1.8]} rotation={[0, 0.3, 0]}>
+        <boxGeometry args={[1.1, 0.6, 0.04]} />
+        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.5} side={THREE.DoubleSide} />
+      </mesh>
+
+      {/* ---------- WINGS ---------- */}
+      {[-1, 1].map((side) => (
+        <group key={side} position={[side * 12.5, 0, -0.5]}>
+          <mesh position={[0, 3.4, 0]} castShadow>
+            <boxGeometry args={[7, 6.8, 5.5]} />
+            <meshStandardMaterial color="#93ADA9" roughness={0.9} />
+          </mesh>
+          <mesh position={[0, 6.9, 0]}>
+            <boxGeometry args={[7.6, 0.4, 6]} />
+            <meshStandardMaterial color="#7B938F" roughness={0.85} />
+          </mesh>
+          {/* wing windows */}
+          {[1.6, 3.4, 5.2].flatMap((y, r) => [-2.4, -0.8, 0.8, 2.4].map((x, c) => (
+            <mesh key={`${r}-${c}`} position={[x, y, 2.78]}>
+              <planeGeometry args={[1.05, 1.25]} />
+              <meshStandardMaterial color={c % 3 === 0 ? accent : "#DDE8E6"} emissive={c % 3 === 0 ? accent : "#000000"} emissiveIntensity={c % 3 === 0 ? 0.35 : 0} roughness={0.3} />
+            </mesh>
+          )))}
+        </group>
+      ))}
+
+      {/* ---------- FRONT PORTICO ---------- */}
+      {[-7.5, -5, -2.5, 2.5, 5, 7.5].map((x) => (
+        <mesh key={x} position={[x, 2.5, 2.9]} castShadow>
+          <boxGeometry args={[0.85, 5, 0.85]} />
+          <meshStandardMaterial color="#E4DCC8" roughness={0.85} />
+        </mesh>
+      ))}
+      <mesh position={[0, 5.3, 2.9]} castShadow>
+        <boxGeometry args={[17.5, 0.55, 3.1]} />
+        <meshStandardMaterial color="#C9BFA8" roughness={0.85} />
+      </mesh>
+      <mesh position={[0, 5.75, 2.9]} rotation={[-0.3, 0, 0]}>
+        <boxGeometry args={[17.6, 0.1, 3.4]} />
+        <meshStandardMaterial color="#B0A688" roughness={0.8} />
+      </mesh>
+      {/* entrance steps + doors */}
+      <mesh position={[0, 0.25, 4.3]} receiveShadow castShadow>
+        <boxGeometry args={[5.5, 0.5, 2.2]} />
+        <meshStandardMaterial color="#B6AC94" roughness={0.9} />
+      </mesh>
+      <mesh position={[0, 0.08, 4.9]} receiveShadow>
+        <boxGeometry args={[6.4, 0.16, 3.2]} />
+        <meshStandardMaterial color="#A49B84" roughness={0.9} />
+      </mesh>
+      {[-1.2, 1.2].map((x) => (
+        <mesh key={x} position={[x, 3.2, 3.62]}>
+          <boxGeometry args={[1.9, 5.4, 0.14]} />
+          <meshStandardMaterial color="#31434A" roughness={0.7} />
+        </mesh>
+      ))}
+
+      {/* ---------- BIG NAME BOARD ---------- */}
+      <mesh position={[0, 7.1, 3.35]}>
+        <planeGeometry args={[6.4 * sign.aspect * 0.3, 6.4 * 0.3]} />
+        <meshBasicMaterial map={sign.tex} transparent depthWrite={false} />
+      </mesh>
+
+      {/* ---------- CAMPUS DETAILS ---------- */}
+      {/* front hedge + trees */}
+      {[[-10, 6.5], [-6, 7.5], [6, 7], [10, 6.5]].map(([x, z]) => (
+        <Tree key={`${x}-${z}`} x={x} z={z - 8} s={1.25} reduced={false} />
+      ))}
+      {[-3, 3].map((x) => (
+        <mesh key={x} position={[x, 0.3, 7.6]} castShadow>
+          <boxGeometry args={[2.2, 0.6, 0.7]} />
+          <meshStandardMaterial color="#3F5C31" roughness={0.95} />
+        </mesh>
+      ))}
+      {/* lamp posts at the gate */}
+      {[-5.5, 5.5].map((x) => (
+        <Lamp key={x} x={x} z={-11} />
+      ))}
     </group>
   );
 }
@@ -202,7 +349,7 @@ function SchoolBuilding() {
   );
 }
 
-export function Track({ length, pool, reduced = false }: { length: number; pool?: { start: number; end: number }; reduced?: boolean }) {
+export function Track({ length, pool, reduced = false, variant = "school", accent = "#FFB86B" }: { length: number; pool?: { start: number; end: number }; reduced?: boolean; variant?: "school" | "twelfth" | "college"; accent?: string }) {
   const paving = useMemo(() => {
     const t = makePavingTexture();
     t.repeat.set(2.4, 1);
@@ -223,12 +370,12 @@ export function Track({ length, pool, reduced = false }: { length: number; pool?
     const planters: number[] = [];
     const benches: number[] = [];
     const worldLen = length / PX;
-    for (let z = 6; z < worldLen + 30; z += 9 + rand() * 5) {
+    for (let z = 6; z < worldLen + 30; z += 6 + rand() * 4) {
       lamps.push(z);
-      if (rand() > 0.35) trees.push({ x: -(5.2 + rand() * 4), z: z + 3 + rand() * 3, s: 0.8 + rand() * 0.7 });
-      if (rand() > 0.55) trees.push({ x: 5.4 + rand() * 4, z: z + 5 + rand() * 3, s: 0.8 + rand() * 0.7 });
-      if (rand() > 0.6) planters.push(z + 2);
-      if (rand() > 0.78) benches.push(z + 4);
+      if (rand() > 0.2) trees.push({ x: -(4.9 + rand() * 5), z: z + 2 + rand() * 3, s: 0.8 + rand() * 0.8 });
+      if (rand() > 0.2) trees.push({ x: 5.1 + rand() * 5, z: z + 4 + rand() * 3, s: 0.8 + rand() * 0.8 });
+      if (rand() > 0.72) planters.push(z + 2);
+      if (rand() > 0.85) benches.push(z + 4);
     }
     return { lamps, trees, planters, benches };
   }, [length]);
@@ -253,9 +400,9 @@ export function Track({ length, pool, reduced = false }: { length: number; pool?
         <meshStandardMaterial map={grass} color="#D5D3BD" roughness={1} />
       </mesh>
       {/* Leave a real opening for the pool; the road continues beyond its exit. */}
-      {roadSections.map(([start, end]) => <RoadSection key={start} start={start} end={end} texture={paving} />)}
+      {roadSections.map(([start, end]) => <RoadSection key={start} start={start} end={end} texture={paving} accent={accent} />)}
       <WindGrass length={worldLen} reduced={reduced} />
-      <SchoolBuilding />
+      {variant === "school" ? <SchoolBuilding /> : <CollegeCampus accent={accent} />}
 
       {/* street furniture — alternate sides */}
       {props.lamps.map((z, i) => (

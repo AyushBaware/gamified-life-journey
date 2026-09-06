@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "../store/store";
 import { sfx } from "../audio/sfx";
-import type { LevelScript, Phase, Toast } from "../game/types";
+import { SKILLS, type LevelScript, type Phase, type Toast } from "../game/types";
 import { GATE_STOP_DISTANCE, PX, SHOP_STOP_DISTANCE } from "../game/constants";
 import { BadgeIcon } from "./BadgeIcon";
 
@@ -63,7 +63,7 @@ export function SkipButton() {
 
 /* ---------- top bar ---------- */
 
-export function TopBar({ chapterName, onPause }: { chapterName: string; onPause: () => void }) {
+export function TopBar({ chapterName, chapterNo, onPause }: { chapterName: string; chapterNo: string; onPause: () => void }) {
   const score = useStore((s) => s.score);
   const distanceM = useStore((s) => s.distanceM);
   const phase = useStore((s) => s.phase);
@@ -72,8 +72,8 @@ export function TopBar({ chapterName, onPause }: { chapterName: string; onPause:
   const setAutoplay = useStore((s) => s.setAutoplay);
   const phaseLabels: Record<Phase, string> = {
     running: "On the path", dive: "Into the pool", swim: "Swimming", exit: "Leaving the pool",
-    gate: "10th Boards", gateburst: "Milestone unlocked", card: "10th Boards",
-    scripted: "Retry & Learn", walk: "Visiting the shop", shopvisit: "Family shop",
+    gate: "At the gate", gateburst: "Milestone unlocked", card: "Milestone",
+    scripted: "Retry & Learn", powerup: "Power-up", walk: "Visiting the shop", shopvisit: "Family shop",
     complete: "Chapter complete", hit: "Watch your step", caught: "Caught",
   };
   return (
@@ -84,7 +84,7 @@ export function TopBar({ chapterName, onPause }: { chapterName: string; onPause:
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
           </span>
-          <span className="text-xs font-bold tracking-[0.14em] text-white">CH.01<span className="hidden sm:inline"> / {chapterName.toUpperCase()}</span></span>
+          <span className="text-xs font-bold tracking-[0.14em] text-white">CH.{chapterNo}<span className="hidden sm:inline"> / {chapterName.toUpperCase()}</span></span>
         </div>
         <button type="button" onClick={(event) => { setAutoplay(!autoplay); if (event.detail > 0) event.currentTarget.blur(); }} aria-pressed={autoplay} aria-label={autoplay ? "Take control: turn cinematic mode off" : "Watch hands-free: turn cinematic mode on"} title={autoplay ? "Cinematic mode. Click to take control." : "Manual mode. Click for cinematic mode."} className={`hud-panel flex h-9 items-center gap-2 rounded-full px-3 text-[10px] font-semibold ${autoplay ? "text-amber-200" : "text-slate-300"}`}>
           <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="m7 4 9 6-9 6V4Z" /></svg>
@@ -115,7 +115,7 @@ export function TopBar({ chapterName, onPause }: { chapterName: string; onPause:
 
 /* ---------- toasts ---------- */
 
-function ToastItem({ id, title, sub, tone, ttl, badgeKind }: Toast) {
+function ToastItem({ id, title, sub, tone, ttl, badgeKind, skill }: Toast) {
   const dismiss = useStore((s) => s.dismissToast);
   const paused = useStore((s) => s.paused);
   const remaining = useRef(ttl);
@@ -140,7 +140,13 @@ function ToastItem({ id, title, sub, tone, ttl, badgeKind }: Toast) {
       className="hud-panel flex items-center gap-3 rounded-xl px-4 py-2.5"
       style={{ borderColor: border }}
     >
-      {badgeKind && <span className="shrink-0 text-amber-200"><BadgeIcon kind={badgeKind} size={22} /></span>}
+      {skill ? (
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[11px] font-black text-ink" style={{ background: SKILLS[skill].glow, boxShadow: `0 0 16px ${SKILLS[skill].glow}` }}>
+          {SKILLS[skill].short}
+        </span>
+      ) : badgeKind ? (
+        <span className="shrink-0 text-amber-200"><BadgeIcon kind={badgeKind} size={22} /></span>
+      ) : null}
       <div>
         <div className="text-sm font-semibold text-white">{title}</div>
         {sub && <div className="text-[11px] text-slate-400">{sub}</div>}
@@ -152,7 +158,7 @@ function ToastItem({ id, title, sub, tone, ttl, badgeKind }: Toast) {
 export function Toasts() {
   const toasts = useStore((s) => s.toasts);
   return (
-    <div className="pointer-events-none absolute left-1/2 top-16 z-30 flex w-[min(92vw,440px)] -translate-x-1/2 flex-col items-center gap-2 sm:top-[72px]" role="status" aria-live="polite" aria-atomic="true">
+    <div className="pointer-events-none absolute left-1/2 top-[118px] z-30 flex w-[min(92vw,440px)] -translate-x-1/2 flex-col items-center gap-2 sm:top-[126px]" role="status" aria-live="polite" aria-atomic="true">
       <AnimatePresence mode="popLayout">
         {toasts.map((t) => (
           <ToastItem key={t.id} {...t} />
@@ -241,14 +247,20 @@ export function JourneyBar({ script }: { script: LevelScript }) {
   const cleared = useStore((s) => s.clearedCount);
   const totalHurdles = useStore((s) => s.totalHurdles);
   const badges = useStore((s) => s.badges);
+  const skillsHave = useStore((s) => s.skills);
+  const collectedSkillIds = useMemo(() => new Set(script.events.flatMap((e) => (e.kind === "skill" && skillsHave.includes(e.skill) ? [e.id] : []))), [script, skillsHave]);
   const progress = phase === "complete" ? 1 : Math.min(1, distanceM / (script.length / PX));
   const markers = useMemo(() => script.events.flatMap((event) => {
     if (event.kind === "swim") return [{ id: event.id, at: event.end / script.length, label: event.label }];
     if (event.kind === "slip") return [{ id: event.id, at: event.x / script.length, label: "Retry & Learn" }];
     if (event.kind === "gate") return [{ id: event.id, at: (event.x - GATE_STOP_DISTANCE) / script.length, label: event.card.title }];
     if (event.kind === "shop") return [{ id: event.id, at: (event.x - SHOP_STOP_DISTANCE) / script.length, label: event.title }];
+    if (event.kind === "powerup") return [{ id: event.id, at: event.x / script.length, label: event.label }];
+    if (event.kind === "skill") return [{ id: event.id, at: event.x / script.length, label: SKILLS[event.skill].label }];
     return [];
   }), [script]);
+  const finish = script.events.find((e) => e.kind === "shop") ?? script.events.find((e) => e.kind === "gate");
+  const finishLabel = finish?.kind === "shop" ? "Family shop" : finish?.kind === "gate" ? finish.card.title : "Finish";
   if (phase === "caught") return null;
   return (
     <div className="pointer-events-none absolute bottom-3 left-3 z-30 sm:bottom-4 sm:left-4">
@@ -270,13 +282,76 @@ export function JourneyBar({ script }: { script: LevelScript }) {
             <span
               key={mk.id} title={mk.label}
               className="absolute -top-[1px] h-2 w-2 rounded-full border border-amber-100/60 transition-colors"
-              style={{ left: `calc(${mk.at * 100}% - 4px)`, background: badges.some((b) => b.id === mk.id) ? "#FFB86B" : "#1B2331" }}
+              style={{ left: `calc(${mk.at * 100}% - 4px)`, background: badges.some((b) => b.id === mk.id) || collectedSkillIds.has(mk.id) ? "#FFB86B" : "#1B2331" }}
             />
           ))}
         </div>
         <div className="mt-2 flex justify-between text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-          <span>School</span>
-          <span className="text-accent" style={{ color: "var(--accent)" }}>Family shop</span>
+          <span>{script.name}</span>
+          <span className="text-accent" style={{ color: "var(--accent)" }}>{finishLabel}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- skills tray — the tech stack fills up as he learns ---------- */
+
+export function SkillsTray({ script }: { script: LevelScript }) {
+  const skills = useStore((s) => s.skills);
+  const lastSkill = useStore((s) => s.lastSkill);
+  const paused = useStore((s) => s.paused);
+  const chapterSkills = useMemo(() => script.events.flatMap((e) => (e.kind === "skill" ? [e.skill] : [])), [script]);
+  const allKnown = useMemo(() => {
+    const merged = [...skills];
+    for (const s of chapterSkills) if (!merged.includes(s)) merged.push(s);
+    return merged;
+  }, [skills, chapterSkills]);
+  if (allKnown.length === 0 || paused) return null;
+  const collected = skills.length;
+  return (
+    <div className="pointer-events-none absolute left-1/2 top-[60px] z-30 -translate-x-1/2 sm:top-[68px]">
+      <div className="hud-panel flex items-center gap-2 rounded-2xl px-3 py-2">
+        <div className="mr-1 flex flex-col leading-none">
+          <span className="text-[9px] font-bold uppercase tracking-[0.22em] text-slate-400">Skills</span>
+          <span className="text-[11px] font-bold tabular-nums text-white">{collected}<span className="text-slate-500">/{allKnown.length}</span></span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <AnimatePresence initial={false}>
+            {allKnown.map((id) => {
+              const def = SKILLS[id];
+              const have = skills.includes(id);
+              const isNew = lastSkill?.id === id && Date.now() - lastSkill.at < 1400;
+              return (
+                <motion.div
+                  key={id}
+                  layout
+                  initial={{ scale: 0.6, opacity: 0, y: 8 }}
+                  animate={have ? { scale: isNew ? [1.35, 0.95, 1.08, 1] : 1, opacity: 1, y: 0 } : { scale: 1, opacity: 1, y: 0 }}
+                  transition={{ type: "spring", stiffness: 380, damping: 22 }}
+                  title={have ? `${def.label} — learned` : `${def.label} — ahead on the path`}
+                  className="relative flex h-8 w-8 items-center justify-center rounded-lg text-[10px] font-black"
+                  style={{
+                    background: have ? def.glow : "rgba(255,255,255,0.05)",
+                    color: have ? "#0B0F19" : "rgba(255,255,255,0.28)",
+                    border: `1px solid ${have ? def.glow : "rgba(255,255,255,0.12)"}`,
+                    boxShadow: have ? `0 0 ${isNew ? 22 : 10}px ${def.glow}` : "none",
+                  }}
+                >
+                  {def.short}
+                  {isNew && (
+                    <motion.span
+                      initial={{ scale: 0.4, opacity: 0.9 }}
+                      animate={{ scale: 2.2, opacity: 0 }}
+                      transition={{ duration: 0.8, ease: "easeOut" }}
+                      className="pointer-events-none absolute inset-0 rounded-lg"
+                      style={{ border: `2px solid ${def.glow}` }}
+                    />
+                  )}
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
         </div>
       </div>
     </div>

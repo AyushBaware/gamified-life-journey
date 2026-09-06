@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Badge, MilestoneCardData, Phase, Pop, Toast } from "../game/types";
+import type { Badge, MilestoneCardData, Phase, Pop, SkillId, Toast } from "../game/types";
 
 const MUTE_KEY = "ayush-run:muted";
 
@@ -19,10 +19,13 @@ interface State {
   autoplay: boolean;
   muted: boolean;
   isTouch: boolean;
+  chapterIndex: number;
   ready: boolean;
   paused: boolean;
   hasJumped: boolean;
   badges: Badge[];
+  skills: SkillId[];
+  lastSkill: { id: SkillId; at: number } | null;
 
   phase: Phase;
   score: number;
@@ -45,6 +48,7 @@ interface State {
   setPaused: (v: boolean) => void;
   setHasJumped: (v: boolean) => void;
   addBadge: (badge: Badge) => void;
+  addSkill: (skill: SkillId) => void;
   setPhase: (p: Phase) => void;
   setStats: (score: number, xp: number, meters: number, cleared: number) => void;
   setTotalHurdles: (n: number) => void;
@@ -56,7 +60,9 @@ interface State {
   setCard: (c: MilestoneCardData | null) => void;
   setCaught: (c: { meters: number } | null) => void;
   setChapterTitle: (v: boolean) => void;
+  setChapterIndex: (n: number) => void;
   resetRunUI: () => void;
+  resetForChapter: () => void;
 }
 
 export const useStore = create<State>((set) => ({
@@ -64,10 +70,13 @@ export const useStore = create<State>((set) => ({
   autoplay: false,
   muted: readMuted(),
   isTouch: false,
+  chapterIndex: 0,
   ready: false,
   paused: false,
   hasJumped: false,
   badges: [],
+  skills: [],
+  lastSkill: null,
 
   phase: "running",
   score: 0,
@@ -99,6 +108,7 @@ export const useStore = create<State>((set) => ({
   setPaused: (paused) => set({ paused }),
   setHasJumped: (hasJumped) => set((s) => s.hasJumped === hasJumped ? s : { hasJumped }),
   addBadge: (badge) => set((s) => s.badges.some((b) => b.id === badge.id) ? s : { badges: [...s.badges, badge] }),
+  addSkill: (skill) => set((s) => ({ skills: s.skills.includes(skill) ? s.skills : [...s.skills, skill], lastSkill: { id: skill, at: Date.now() } })),
   setPhase: (phase) => set({ phase }),
   setStats: (score, xp, distanceM, clearedCount) => set({ score, xp, distanceM, clearedCount }),
   setTotalHurdles: (totalHurdles) => set({ totalHurdles }),
@@ -110,6 +120,7 @@ export const useStore = create<State>((set) => ({
   setCard: (card) => set({ card }),
   setCaught: (caught) => set({ caught }),
   setChapterTitle: (chapterTitle) => set({ chapterTitle }),
+  setChapterIndex: (chapterIndex) => set({ chapterIndex }),
   resetRunUI: () =>
     set({
       phase: "running",
@@ -120,6 +131,23 @@ export const useStore = create<State>((set) => ({
       paused: false,
       hasJumped: false,
       badges: [],
+      skills: [],
+      lastSkill: null,
+      toasts: [],
+      pops: [],
+      card: null,
+      caught: null,
+      chapterTitle: true,
+    }),
+  resetForChapter: () =>
+    set({
+      phase: "running",
+      score: 0,
+      xp: 0,
+      distanceM: 0,
+      clearedCount: 0,
+      paused: false,
+      hasJumped: false,
       toasts: [],
       pops: [],
       card: null,
